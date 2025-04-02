@@ -29,6 +29,67 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Mostrar modal de éxito
+  void _showSuccessModal(BuildContext context, String locationMessage) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          content: SizedBox(
+            height: 300,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.check_circle,
+                  color: Colors.green,
+                  size: 80,
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  '¡Lugar Correcto!',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  locationMessage,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (_imageFile != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.file(
+                      _imageFile!,
+                      height: 100,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cerrar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // Enviar imagen y verificar resultado
   Future<void> _sendPhoto() async {
     if (_imageFile == null) return;
@@ -56,12 +117,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (_score != null && _score! > 0.9) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              "✅ $_resultado (Score: ${_score!.toStringAsFixed(4)})",
-            ),
+        SnackBar(
+          content: Text(
+            "✅ $_resultado (Score: ${_score!.toStringAsFixed(4)})"
           ),
-        );
+        ),
+      );
 
         var position = await LocationService.getCurrentLocation();
         if (position == null) {
@@ -77,9 +138,10 @@ class _HomeScreenState extends State<HomeScreen> {
           position.latitude,
           position.longitude,
         );
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(locationMessage)));
+        
+        // Mostrar modal en lugar de SnackBar
+        _showSuccessModal(context, locationMessage);
+        
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
