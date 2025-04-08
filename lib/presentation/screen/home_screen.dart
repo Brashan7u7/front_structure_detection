@@ -14,8 +14,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   File? _imageFile;
-  String? _resultado;
-  double? _score;
 
   // Tomar foto
   Future<void> _takePhoto() async {
@@ -23,71 +21,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (pickedFile != null) {
       setState(() {
         _imageFile = pickedFile;
-        _resultado = null;
-        _score = null;
       });
     }
-  }
-
-  // Mostrar modal de éxito
-  void _showSuccessModal(BuildContext context, String locationMessage) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          content: SizedBox(
-            height: 300,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.check_circle,
-                  color: Colors.green,
-                  size: 80,
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  '¡Lugar Correcto!',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  locationMessage,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                if (_imageFile != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.file(
-                      _imageFile!,
-                      height: 100,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cerrar'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   // Enviar imagen y verificar resultado
@@ -99,60 +34,63 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     try {
-      var response = await ApiService.uploadImage(_imageFile!);
-
-      if (response == null) {
+      // Obtener la ubicación actual
+      var position = await LocationService.getCurrentLocation();
+      if (position == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("❌ No se recibió respuesta del servidor."),
+            content: Text("⚠️ No se pudo obtener la ubicación."),
           ),
         );
         return;
       }
 
-      setState(() {
-        _resultado = response["resultado"] as String? ?? "Desconocido";
-        _score = (response["score"] as num?)?.toDouble();
-      });
-
-      if (_score != null && _score! > 0.9) {
-        ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "✅ $_resultado (Score: ${_score!.toStringAsFixed(4)})"
-          ),
-        ),
+      // Enviar imagen y ubicación
+      var response = await ApiService.uploadImage(
+        _imageFile!,
+        position.latitude,
+        position.longitude,
       );
 
-        var position = await LocationService.getCurrentLocation();
-        if (position == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("⚠️ No se pudo obtener la ubicación."),
-            ),
-          );
-          return;
-        }
-
-        String locationMessage = await ApiService.sendLocation(
-          position.latitude,
-          position.longitude,
-        );
-        
-        // Mostrar modal en lugar de SnackBar
-        _showSuccessModal(context, locationMessage);
-        
-      } else {
+      if (response == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("🚫 No es el lugar correcto. Intenta otra foto 📷"),
-          ),
+          const SnackBar(content: Text("❌ No se recibió respuesta del servidor.")),
         );
+        return;
       }
+
+      // Mostrar resultados en un diálogo
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text("Resultado del Modelo"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("📌 Resultado: ${response["resultado"]}"),
+                Text("🏫 Clase detectada: ${response["clase_detectada"]}"),
+                Text("🎯 Confianza: ${(response["confianza"] * 100).toStringAsFixed(2)}%"),
+                Text("📏 Distancia: ${response["distancia_metros"]} metros"),
+                Text("🔢 Estado: ${response["estado"]}"),
+                Text("💬 Detalles: ${response["mensaje_detallado"]}"),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text("Cerrar"),
+              ),
+            ],
+          );
+        },
+      );
+
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("❌ Error: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ Error: $e")),
+      );
     }
   }
 
@@ -174,18 +112,6 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               ImageDisplay(imageFile: _imageFile),
-              if (_resultado != null && _score != null)
-                Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Text(
-                    "📌 $_resultado\n🎯 Precisión: ${(_score! * 100).toStringAsFixed(4)}%",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
               const SizedBox(height: 30),
               ElevatedButton(
                 onPressed: _takePhoto,
